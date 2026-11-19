@@ -40,6 +40,7 @@
 
 #ifdef PDCURSES
 int ESCDELAY;
+# define resizeterm resize_term /* ncurses extension; PDCurses spells it so */
 #endif
 
 #ifndef NCURSES_REENTRANT
@@ -172,7 +173,7 @@ typedef struct {
 #define TAGMASK     ((1 << LENGTH(tags)) - 1)
 
 #ifdef NDEBUG
- #define debug(format, args...)
+ #define debug(...) /* WIN32/C99: was the GNU form debug(format, args...) */
 #else
  #define debug eprint
 #endif
@@ -881,9 +882,9 @@ static void
 keypress(int code) {
 	int key = -1;
 	unsigned int len = 1;
-	char buf[8] = { '\e' };
+	char buf[8] = { '\033' };
 
-	if (code == '\e') {
+	if (code == '\033') {
 		/* pass characters following escape to the underlying app */
 		nodelay(stdscr, TRUE);
 		for (int t; len < sizeof(buf) && (t = getch()) != ERR; len++) {
@@ -899,7 +900,7 @@ keypress(int code) {
 	for (Client *c = runinall ? nextvisible(clients) : sel; c; c = nextvisible(c->next)) {
 		if (is_content_visible(c)) {
 			c->urgent = false;
-			if (code == '\e')
+			if (code == '\033')
 				vt_write(c->term, buf, len);
 			else
 				vt_keypress(c->term, code);
@@ -925,6 +926,19 @@ mouse_setup(void) {
 #endif /* CONFIG_MOUSE */
 }
 
+#ifdef _WIN32
+static bool
+checkshell(const char *shell) {
+	/* C:\Windows\System32\cmd.exe, C:/msys64/usr/bin/bash.exe */
+	if (shell == NULL || !shell[0] || shell[1] != ':')
+		return false;
+	const char *b1 = strrchr(shell, '/'), *b2 = strrchr(shell, '\\');
+	const char *base = (b1 > b2 ? b1 : b2) + 1;
+	if (!strncmp(base, dvtm_name, strlen(dvtm_name)))
+		return false;
+	return access(shell, F_OK) == 0;
+}
+#else
 static bool
 checkshell(const char *shell) {
 	if (shell == NULL || *shell == '\0' || *shell != '/')
@@ -935,6 +949,7 @@ checkshell(const char *shell) {
 		return false;
 	return true;
 }
+#endif
 
 static const char *
 getshell(void) {
@@ -945,13 +960,20 @@ getshell(void) {
 		return shell;
 	if ((pw = getpwuid(getuid())) && checkshell(pw->pw_shell))
 		return pw->pw_shell;
+#ifdef _WIN32
+	return "cmd.exe";
+#else
 	return "/bin/sh";
+#endif
 }
 
 static void
 setup(void) {
 	shell = getshell();
 	setlocale(LC_CTYPE, "");
+#ifdef _WIN32
+	compat_console_events_mode(1);
+#endif
 	initscr();
 	start_color();
 	noecho();
@@ -1036,9 +1058,17 @@ cleanup(void) {
 static char *getcwd_by_pid(Client *c) {
 	if (!c)
 		return NULL;
+#ifdef _WIN32
+	/* WIN32: another process' cwd lives in its PEB
+	 * (RTL_USER_PROCESS_PARAMETERS.CurrentDirectory); not worth an
+	 * NtQueryInformationProcess + ReadProcessMemory here: new windows
+	 * start in dvtm's own directory. */
+	return NULL;
+#else
 	char buf[32];
 	snprintf(buf, sizeof buf, "/proc/%d/cwd", c->pid);
 	return realpath(buf, NULL);
+#endif
 }
 
 static void

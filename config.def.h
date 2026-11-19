@@ -206,4 +206,5 @@ static Action actions[] = {
 
 static char const * const keytable[] = {
 	/* add your custom key escape sequences */
+	NULL, /* WIN32: C11 forbids an empty initializer list */
 };

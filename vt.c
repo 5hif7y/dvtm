@@ -207,44 +207,44 @@ static const char *keytable[KEY_MAX+1] = {
 	[KEY_RIGHT]     = "C",
 	[KEY_LEFT]      = "D",
 #ifdef KEY_SUP
-	[KEY_SUP]       = "\e[1;2A",
+	[KEY_SUP]       = "\033[1;2A",
 #endif
 #ifdef KEY_SDOWN
-	[KEY_SDOWN]     = "\e[1;2B",
+	[KEY_SDOWN]     = "\033[1;2B",
 #endif
-	[KEY_SRIGHT]    = "\e[1;2C",
-	[KEY_SLEFT]     = "\e[1;2D",
+	[KEY_SRIGHT]    = "\033[1;2C",
+	[KEY_SLEFT]     = "\033[1;2D",
 	[KEY_BACKSPACE] = "\177",
-	[KEY_IC]        = "\e[2~",
-	[KEY_DC]        = "\e[3~",
-	[KEY_PPAGE]     = "\e[5~",
-	[KEY_NPAGE]     = "\e[6~",
-	[KEY_HOME]      = "\e[7~",
-	[KEY_END]       = "\e[8~",
-	[KEY_BTAB]      = "\e[Z",
+	[KEY_IC]        = "\033[2~",
+	[KEY_DC]        = "\033[3~",
+	[KEY_PPAGE]     = "\033[5~",
+	[KEY_NPAGE]     = "\033[6~",
+	[KEY_HOME]      = "\033[7~",
+	[KEY_END]       = "\033[8~",
+	[KEY_BTAB]      = "\033[Z",
 	[KEY_SUSPEND]   = "\x1A",  /* Ctrl+Z gets mapped to this */
-	[KEY_F(1)]      = "\e[11~",
-	[KEY_F(2)]      = "\e[12~",
-	[KEY_F(3)]      = "\e[13~",
-	[KEY_F(4)]      = "\e[14~",
-	[KEY_F(5)]      = "\e[15~",
-	[KEY_F(6)]      = "\e[17~",
-	[KEY_F(7)]      = "\e[18~",
-	[KEY_F(8)]      = "\e[19~",
-	[KEY_F(9)]      = "\e[20~",
-	[KEY_F(10)]     = "\e[21~",
-	[KEY_F(11)]     = "\e[23~",
-	[KEY_F(12)]     = "\e[24~",
-	[KEY_F(13)]     = "\e[23~",
-	[KEY_F(14)]     = "\e[24~",
-	[KEY_F(15)]     = "\e[25~",
-	[KEY_F(16)]     = "\e[26~",
-	[KEY_F(17)]     = "\e[28~",
-	[KEY_F(18)]     = "\e[29~",
-	[KEY_F(19)]     = "\e[31~",
-	[KEY_F(20)]     = "\e[32~",
-	[KEY_F(21)]     = "\e[33~",
-	[KEY_F(22)]     = "\e[34~",
+	[KEY_F(1)]      = "\033[11~",
+	[KEY_F(2)]      = "\033[12~",
+	[KEY_F(3)]      = "\033[13~",
+	[KEY_F(4)]      = "\033[14~",
+	[KEY_F(5)]      = "\033[15~",
+	[KEY_F(6)]      = "\033[17~",
+	[KEY_F(7)]      = "\033[18~",
+	[KEY_F(8)]      = "\033[19~",
+	[KEY_F(9)]      = "\033[20~",
+	[KEY_F(10)]     = "\033[21~",
+	[KEY_F(11)]     = "\033[23~",
+	[KEY_F(12)]     = "\033[24~",
+	[KEY_F(13)]     = "\033[23~",
+	[KEY_F(14)]     = "\033[24~",
+	[KEY_F(15)]     = "\033[25~",
+	[KEY_F(16)]     = "\033[26~",
+	[KEY_F(17)]     = "\033[28~",
+	[KEY_F(18)]     = "\033[29~",
+	[KEY_F(19)]     = "\033[31~",
+	[KEY_F(20)]     = "\033[32~",
+	[KEY_F(21)]     = "\033[33~",
+	[KEY_F(22)]     = "\033[34~",
 	[KEY_RESIZE]    = "",
 #ifdef KEY_EVENT
 	[KEY_EVENT]     = "",
@@ -285,10 +285,13 @@ static void row_roll(Row *start, Row *end, int count)
 		count += n;
 
 	if (count) {
-		char buf[count * sizeof(Row)];
+		char *buf = malloc(count * sizeof(Row)); /* WIN32: was a VLA */
+		if (!buf)
+			return;
 		memcpy(buf, start, count * sizeof(Row));
 		memmove(start, start + count, (n - count) * sizeof(Row));
 		memcpy(end - count, buf, count * sizeof(Row));
+		free(buf);
 		for (Row *row = start; row < end; row++)
 			row->dirty = true;
 	}
@@ -683,7 +686,7 @@ static void interpret_csi_sgr(Vt *t, int param[], int pcount)
 		case 28:
 			b->curattrs &= ~A_INVIS;
 			break;
-		case 30 ... 37:	/* fg */
+		case 30: case 31: case 32: case 33: case 34: case 35: case 36: case 37:	/* fg */
 			b->curfg = param[i] - 30;
 			break;
 		case 38:
@@ -695,7 +698,7 @@ static void interpret_csi_sgr(Vt *t, int param[], int pcount)
 		case 39:
 			b->curfg = -1;
 			break;
-		case 40 ... 47:	/* bg */
+		case 40: case 41: case 42: case 43: case 44: case 45: case 46: case 47:	/* bg */
 			b->curbg = param[i] - 40;
 			break;
 		case 48:
@@ -707,10 +710,10 @@ static void interpret_csi_sgr(Vt *t, int param[], int pcount)
 		case 49:
 			b->curbg = -1;
 			break;
-		case 90 ... 97:	/* hi fg */
+		case 90: case 91: case 92: case 93: case 94: case 95: case 96: case 97:	/* hi fg */
 			b->curfg = param[i] - 82;
 			break;
-		case 100 ... 107: /* hi bg */
+		case 100: case 101: case 102: case 103: case 104: case 105: case 106: case 107: /* hi bg */
 			b->curbg = param[i] - 92;
 			break;
 		default:
@@ -1197,7 +1200,7 @@ static void try_interpret_escape_seq(Vt *t)
 		break;
 	case ']': /* OSC - operating system command */
 		if (lastchar == '\a' ||
-		   (lastchar == '\\' && t->elen >= 2 && t->ebuf[t->elen - 2] == '\e')) {
+		   (lastchar == '\\' && t->elen >= 2 && t->ebuf[t->elen - 2] == '\033')) {
 			t->elen -= lastchar == '\a' ? 1 : 2;
 			t->ebuf[t->elen] = '\0';
 			interpret_osc(t);
@@ -1276,7 +1279,7 @@ static void process_nonprinting(Vt *t, wchar_t wc)
 {
 	Buffer *b = t->buffer;
 	switch (wc) {
-	case '\e': /* ESC */
+	case '\033': /* ESC */
 		new_escape_sequence(t);
 		break;
 	case '\a': /* BEL */
@@ -1413,6 +1416,12 @@ int vt_process(Vt *t)
 	res = read(t->pty, t->rbuf + t->rlen, sizeof(t->rbuf) - t->rlen);
 	if (res < 0)
 		return -1;
+#ifdef _WIN32
+	if (res == 0) {
+		errno = EIO; /* Linux semantics of a master whose slave is gone */
+		return -1;
+	}
+#endif
 
 	t->rlen += res;
 	while (pos < t->rlen) {
@@ -1536,7 +1545,7 @@ void vt_draw(Vt *t, WINDOW *win, int srow, int scol)
 			}
 
 			if (is_utf8 && cell->text >= 128) {
-				char buf[MB_CUR_MAX + 1];
+				char buf[MB_LEN_MAX + 1]; /* UCRT: MB_CUR_MAX is a call */
 				size_t len = wcrtomb(buf, cell->text, NULL);
 				if (len > 0) {
 					waddnstr(win, buf, len);
@@ -1600,6 +1609,38 @@ pid_t vt_forkpty(Vt *t, const char *p, const char *argv[], const char *cwd, cons
 		from = NULL;
 	}
 
+#ifdef _WIN32
+	/*
+	 * WIN32: the child does not talk to *us* but to the conhost behind
+	 * ConPTY, which re-renders everything into a fixed xterm-like dialect.
+	 * TERM must describe that terminal, not dvtm's emulator: programs with
+	 * a terminfo database (vim, less from Git for Windows/MSYS) would not
+	 * know "dvtm-256color" anyway.
+	 */
+	const char *envv[2 * 16 + 3];
+	int ne = 0;
+	for (const char **envp = env; envp && envp[0] && ne < 2 * 16; envp += 2) {
+		envv[ne++] = envp[0];
+		envv[ne++] = envp[1];
+	}
+	envv[ne++] = "TERM";
+	envv[ne++] = "xterm-256color";
+	envv[ne] = NULL;
+
+	struct compat_spawn_opts o;
+	memset(&o, 0, sizeof(o));
+	o.argv = argv;
+	o.cwd = cwd;
+	o.env = envv;
+	o.ws = ws;
+	o.stdin_fd = to ? vt2ed[0] : -1;
+	o.stdout_fd = from ? ed2vt[1] : -1;
+	(void)vt_term;
+	(void)p; /* argv[0] is resolved through PATH by compat_spawn_pty */
+	pid_t pid = compat_spawn_pty(&o, &t->pty);
+	if (pid < 0)
+		return -1;
+#else
 	pid_t pid = forkpty(&t->pty, NULL, NULL, &ws);
 	if (pid < 0)
 		return -1;
@@ -1652,6 +1693,7 @@ pid_t vt_forkpty(Vt *t, const char *p, const char *argv[], const char *cwd, cons
 		fprintf(stderr, "\nexecv() failed.\nCommand: '%s'\n", argv[0]);
 		exit(1);
 	}
+#endif
 
 	if (to) {
 		close(vt2ed[0]);
@@ -1693,7 +1735,7 @@ static void send_curs(Vt *t)
 {
 	Buffer *b = t->buffer;
 	char keyseq[16];
-	snprintf(keyseq, sizeof keyseq, "\e[%d;%dR", (int)(b->curs_row - b->lines), b->curs_col);
+	snprintf(keyseq, sizeof keyseq, "\033[%d;%dR", (int)(b->curs_row - b->lines), b->curs_col);
 	vt_write(t, keyseq, strlen(keyseq));
 }
 
@@ -1707,7 +1749,7 @@ void vt_keypress(Vt *t, int keycode)
 		case KEY_DOWN:
 		case KEY_RIGHT:
 		case KEY_LEFT: {
-			char keyseq[3] = { '\e', (t->curskeymode ? 'O' : '['), keytable[keycode][0] };
+			char keyseq[3] = { '\033', (t->curskeymode ? 'O' : '['), keytable[keycode][0] };
 			vt_write(t, keyseq, sizeof keyseq);
 			break;
 		}
@@ -1727,7 +1769,7 @@ void vt_keypress(Vt *t, int keycode)
 void vt_mouse(Vt *t, int x, int y, mmask_t mask)
 {
 #ifdef NCURSES_MOUSE_VERSION
-	char seq[6] = { '\e', '[', 'M' }, state = 0, button = 0;
+	char seq[6] = { '\033', '[', 'M' }, state = 0, button = 0;
 
 	if (!t->mousetrack)
 		return;
